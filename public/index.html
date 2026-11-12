@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Procucev VoiceFlow — Real-Time Multilingual STT</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">VF</div>
+      <div>
+        <h1>Procucev VoiceFlow</h1>
+        <p class="subtitle">Real-Time Multilingual Speech-to-Text &amp; CRUD Dashboard</p>
+      </div>
+    </div>
+    <div class="status-pills">
+      <span id="dbStatusBadge" class="pill pill-neutral">DB: Checking...</span>
+      <span id="wsStatusBadge" class="pill pill-neutral">WS: Connecting...</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- KPI Row -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">Total Transcriptions</span>
+        <strong id="kpiTotal" class="kpi-value">0</strong>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Total Duration</span>
+        <strong id="kpiDuration" class="kpi-value">0s</strong>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Starred Notes</span>
+        <strong id="kpiStarred" class="kpi-value">0</strong>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Active STT Engine</span>
+        <strong id="kpiEngine" class="kpi-value kpi-small">Browser Live STT</strong>
+      </div>
+    </section>
+
+    <!-- Real-Time Studio -->
+    <section class="card studio-card">
+      <div class="card-header">
+        <div>
+          <h2>Real-Time Transcription Studio</h2>
+          <p class="muted">Speak in Hindi, English, or mixed Hinglish — words stream live below.</p>
+        </div>
+        <div class="studio-controls">
+          <select id="languageSelect" aria-label="Language mode">
+            <option value="hi-IN / en-IN">Multilingual (Hindi + English)</option>
+            <option value="hi-IN">Hindi (hi-IN)</option>
+            <option value="en-IN">English (en-IN)</option>
+          </select>
+          <select id="providerSelect" aria-label="STT Engine">
+            <option value="browser-webspeech">Browser Live STT (No Key Needed)</option>
+            <option value="gemini-live-3.1">Gemini Live 3.1 (WebSocket Audio)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="visualizer-bar">
+        <button id="recordBtn" class="btn btn-primary">
+          <span class="rec-dot"></span>
+          <span id="recordBtnLabel">Start Recording</span>
+        </button>
+        <canvas id="waveformCanvas" width="600" height="48"></canvas>
+        <div class="timer-box">
+          <span id="timerDisplay">00:00</span>
+        </div>
+      </div>
+
+      <div class="live-transcript-box">
+        <label for="liveTitleInput" class="sr-only">Session Title</label>
+        <input
+          id="liveTitleInput"
+          type="text"
+          class="title-input"
+          placeholder="Optional title (auto-generated from transcript if left blank)..."
+        />
+        <div id="liveTextArea" class="transcript-stream" contenteditable="true" data-placeholder="Your real-time transcription will appear here. You can also type or edit directly..."></div>
+        <div id="interimLine" class="interim-line"></div>
+      </div>
+
+      <div class="studio-footer">
+        <label class="checkbox-label">
+          <input type="checkbox" id="autoSaveToggle" checked />
+          Auto-save to PostgreSQL on stop
+        </label>
+        <div class="btn-group">
+          <button id="clearLiveBtn" class="btn btn-ghost">Clear</button>
+          <button id="saveLiveBtn" class="btn btn-success">Save to Database</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- History & CRUD Dashboard -->
+    <section class="card history-card">
+      <div class="card-header">
+        <div>
+          <h2>Transcription History</h2>
+          <p class="muted">Search, inspect, edit, star, export, or delete saved records.</p>
+        </div>
+        <button id="newManualBtn" class="btn btn-secondary">+ New Note</button>
+      </div>
+
+      <div class="toolbar">
+        <input
+          id="searchInput"
+          type="search"
+          class="search-input"
+          placeholder="Search by title or transcript text..."
+        />
+        <select id="filterProvider" aria-label="Filter by provider">
+          <option value="">All Engines</option>
+          <option value="gemini-live-3.1">Gemini Live 3.1</option>
+          <option value="browser-webspeech">Browser Live STT</option>
+          <option value="manual">Manual Entry</option>
+        </select>
+        <label class="checkbox-label">
+          <input type="checkbox" id="filterStarred" />
+          Starred only
+        </label>
+      </div>
+
+      <div id="historyList" class="history-list">
+        <div class="empty-state">Loading transcriptions...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Create / Edit Modal -->
+  <div id="crudModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Edit Transcription</h3>
+        <button id="closeModalBtn" class="btn-icon" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="crudForm">
+        <input type="hidden" id="modalRecordId" />
+        <div class="form-group">
+          <label for="modalTitleInput">Title</label>
+          <input id="modalTitleInput" type="text" required placeholder="e.g., Client Sync - Hinglish" />
+        </div>
+        <div class="form-group">
+          <label for="modalLanguageInput">Language</label>
+          <input id="modalLanguageInput" type="text" value="hi-IN / en-IN" />
+        </div>
+        <div class="form-group">
+          <label for="modalTextInput">Transcript</label>
+          <textarea id="modalTextInput" rows="6" required placeholder="Enter or edit transcript text..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelModalBtn" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
